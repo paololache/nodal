@@ -7,9 +7,17 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-sans: var(--font-instrument);
+  --font-mono: var(--font-jetbrains);
+  --font-heading: var(--font-anybody);
+  --font-display: var(--font-anybody);
+  --color-papel: var(--papel);
+  --color-panel: var(--panel);
+  --color-tinta: var(--tinta);
+  --color-tenue: var(--tenue);
+  --color-linea: var(--linea);
+  --color-senal: var(--senal);
+  --color-alerta: var(--alerta);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -126,5 +134,44 @@
   }
   html {
     @apply font-sans;
+  }
+}
+/* Nodal site tokens — papel matches the ConstellationGrid canvas background in each scheme */
+:root {
+  color-scheme: light;
+  --papel: #f8fafc;
+  --panel: #eef2f6;
+  --tinta: #0f172a;
+  --tenue: #52627a;
+  --linea: rgb(15 23 42 / 0.12);
+  --senal: #0272ad;
+  --alerta: #c2410c;
+  --background: var(--papel);
+  --foreground: var(--tinta);
+  --border: var(--linea);
+  --ring: var(--senal);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --papel: #030407;
+    --panel: #0a0f18;
+    --tinta: #e2e8f0;
+    --tenue: #8b9ab0;
+    --linea: rgb(255 255 255 / 0.1);
+    --senal: #38bdf8;
+    --alerta: #fb923c;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--senal);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
   }
 }

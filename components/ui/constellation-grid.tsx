@@ -2,6 +2,8 @@
 
 import React, { useEffect, useRef, useSyncExternalStore } from 'react';
 
+import { cn } from '@/lib/utils';
+
 interface Node {
     x: number;
     y: number;
@@ -26,7 +28,13 @@ function getColorSchemeSnapshot() {
     return window.matchMedia(DARK_QUERY).matches;
 }
 
-export default function ConstellationGrid() {
+interface ConstellationGridProps {
+    /** Replaces the default title overlay. */
+    children?: React.ReactNode;
+    className?: string;
+}
+
+export default function ConstellationGrid({ children, className }: ConstellationGridProps) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     // Sync theme preference (SSR renders dark by default)
     const isDarkMode = useSyncExternalStore(subscribeToColorScheme, getColorSchemeSnapshot, () => true);
@@ -41,6 +49,9 @@ export default function ConstellationGrid() {
         let animationFrameId: number;
         let width = 0;
         let height = 0;
+        let isVisible = true;
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const container = canvas.parentElement ?? canvas;
 
         // Mouse velocity & inertial tracking
         const mouse = {
@@ -57,8 +68,8 @@ export default function ConstellationGrid() {
 
         const handleResize = () => {
             const dpr = Math.min(window.devicePixelRatio || 1, 2);
-            width = window.innerWidth;
-            height = window.innerHeight;
+            width = container.clientWidth;
+            height = container.clientHeight;
             canvas.width = width * dpr;
             canvas.height = height * dpr;
             canvas.style.width = `${width}px`;
@@ -69,8 +80,10 @@ export default function ConstellationGrid() {
         };
 
         const handleMouseMove = (e: MouseEvent) => {
-            mouse.x = e.clientX;
-            mouse.y = e.clientY;
+            // Relative to the canvas so the effect stays aligned when the page scrolls
+            const rect = canvas.getBoundingClientRect();
+            mouse.x = e.clientX - rect.left;
+            mouse.y = e.clientY - rect.top;
         };
 
         const handleMouseLeave = () => {
@@ -104,7 +117,13 @@ export default function ConstellationGrid() {
         };
 
         handleResize();
-        window.addEventListener('resize', handleResize);
+        const resizeObserver = new ResizeObserver(handleResize);
+        resizeObserver.observe(container);
+        // Skip drawing while the grid is scrolled out of view
+        const intersectionObserver = new IntersectionObserver(([entry]) => {
+            isVisible = entry.isIntersecting;
+        });
+        intersectionObserver.observe(canvas);
         window.addEventListener('mousemove', handleMouseMove);
         document.documentElement.addEventListener('mouseleave', handleMouseLeave);
 
@@ -114,6 +133,11 @@ export default function ConstellationGrid() {
             // Normalize dt across high-refresh displays
             const dt = Math.min((now - lastTime) / 1000, 0.05);
             lastTime = now;
+
+            if (!isVisible) {
+                animationFrameId = requestAnimationFrame(render);
+                return;
+            }
 
             // Mouse velocity calculation
             mouse.vx = (mouse.x - mouse.prevX) / (dt * 1000 || 1);
@@ -137,7 +161,7 @@ export default function ConstellationGrid() {
 
             for (let i = 0; i < nodes.length; i++) {
                 const n = nodes[i];
-                n.pulse += dt * 3;
+                n.pulse += reduceMotion ? 0 : dt * 3;
 
                 // Mouse distance vectors
                 const dx = mouse.x - n.x;
@@ -145,7 +169,7 @@ export default function ConstellationGrid() {
                 const dist = Math.sqrt(dx * dx + dy * dy);
 
                 // Dynamic shockwave repulsion based on cursor speed
-                if (dist < mouse.radius && dist > 0) {
+                if (!reduceMotion && dist < mouse.radius && dist > 0) {
                     const power = (1 - dist / mouse.radius);
                     const force = power * (1500 + speed * 150);
                     const angle = Math.atan2(dy, dx);
@@ -246,25 +270,30 @@ export default function ConstellationGrid() {
 
         return () => {
             cancelAnimationFrame(animationFrameId);
-            window.removeEventListener('resize', handleResize);
+            resizeObserver.disconnect();
+            intersectionObserver.disconnect();
             window.removeEventListener('mousemove', handleMouseMove);
             document.documentElement.removeEventListener('mouseleave', handleMouseLeave);
         };
     }, [isDarkMode]);
 
     return (
-        <div className="relative w-full h-screen overflow-hidden select-none bg-slate-950">
+        <div className={cn('relative w-full h-screen overflow-hidden select-none bg-slate-950', className)}>
             <canvas ref={canvasRef} className="absolute inset-0 block cursor-crosshair" />
 
-            {/* Seamless overlay title */}
-            <div className="relative z-10 flex h-full flex-col items-center justify-center text-center px-4 pointer-events-none mix-blend-difference text-white">
-                <h1 className="font-mono text-6xl md:text-9xl font-black tracking-tighter uppercase leading-none">
-                    Constellation
-                </h1>
-                <p className="mt-4 font-mono text-xs md:text-sm max-w-lg opacity-70">
-                    High-velocity dynamic mesh. Sweep your cursor quickly across the grid to unleash kinetic shockwaves.
-                </p>
-            </div>
+            {children ? (
+                <div className="relative z-10 h-full pointer-events-none">{children}</div>
+            ) : (
+                /* Seamless overlay title */
+                <div className="relative z-10 flex h-full flex-col items-center justify-center text-center px-4 pointer-events-none mix-blend-difference text-white">
+                    <h1 className="font-mono text-6xl md:text-9xl font-black tracking-tighter uppercase leading-none">
+                        Constellation
+                    </h1>
+                    <p className="mt-4 font-mono text-xs md:text-sm max-w-lg opacity-70">
+                        High-velocity dynamic mesh. Sweep your cursor quickly across the grid to unleash kinetic shockwaves.
+                    </p>
+                </div>
+            )}
         </div>
     );
 }
